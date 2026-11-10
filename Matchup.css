@@ -303,3 +303,121 @@ code {
     flex-wrap: wrap;
   }
 }
+/* ==========================================
+   RIVALON CHARACTER IMAGE FIX
+   Keeps original design and mobile styling
+========================================== */
+
+.fighter {
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.fighter img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: 230px;
+    object-fit: contain;
+    object-position: center;
+    border-radius: 12px;
+    margin: 0 auto 12px;
+    background: rgba(5, 7, 18, 0.35);
+}
+
+/* Keep character names readable */
+.fighter > div {
+    overflow-wrap: anywhere;
+}
+
+/* Tablet layout */
+@media (max-width: 900px) {
+    .stage {
+        width: 100%;
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .fighter {
+        max-width: 100%;
+    }
+}
+
+/* Mobile image and matchup layout */
+@media (max-width: 600px) {
+    .stage {
+        padding: 25px 12px 55px;
+    }
+
+    .title {
+        font-size: 32px;
+    }
+
+    .arena {
+        gap: 10px;
+        justify-content: center;
+        align-items: stretch;
+    }
+
+    .fighter {
+        width: calc(50% - 8px);
+        min-width: 0;
+        padding: 14px 7px;
+        font-size: 18px;
+        border-radius: 15px;
+    }
+
+    .fighter img {
+        height: 170px;
+        object-fit: contain;
+    }
+
+    .orb {
+        width: 65px;
+        height: 65px;
+        font-size: 28px;
+    }
+
+    .clash {
+        width: 75px;
+    }
+
+    .result {
+        padding: 16px 12px;
+    }
+
+    .banner {
+        font-size: 25px;
+    }
+
+    .stat {
+        grid-template-columns: 1fr 65px 1fr;
+        gap: 6px;
+        font-size: 12px;
+    }
+
+    .scen {
+        grid-template-columns: 1fr;
+    }
+
+    .actions button {
+        margin: 5px 0;
+        width: 100%;
+    }
+}
+
+/* Very narrow phones */
+@media (max-width: 360px) {
+    .fighter {
+        font-size: 15px;
+        padding: 10px 5px;
+    }
+
+    .fighter img {
+        height: 135px;
+    }
+
+    .clash {
+        width: 55px;
+    }
+}
