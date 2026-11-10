@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rivalon | Matchup</title>
+    <link rel="stylesheet" href="Matchup.css">
+    <link rel="shortcut icon" href="renox-logo-32x32.png" type="image/x-icon">
+</head>
+<body>
+    <!-- NAVIGATION-BAR     -->
+    <div class="nav-bar">
+        <div class="container1">
+<div class="types1">
+    <img src="./renox-R-icon.png" alt="" class="img1">
+<h2 class="type1"><span class="span1">R</span>ivalon</h2>
+</div>
+<div class="texts1">
+<a href="./index.html" class="href">
+<button class="button1">
+Home
+</button>     
+</a>
+<a href="./Matchup.html" class="href">
+<button class="button2">
+Matchup
+</button>
+</a>
+<a href="./About.html" class="href">
+<button class="button3">
+About
+</button>
+</a>
+<a href="./Profile.html" class="href">
+<button class="button4">
+Profile
+</button>
+</a>
+</div>
+<a href="./Explore.html" class="href">
+<button class="button5">
+👑 Explore
+</button>
+</a>
+</div>
+    </div>
+    <div class="line"></div>
+<!-- MAIN-BAR -->
+<video autoplay muted loop playsinline class="bgvid"><source src="background.mp4" type="video/mp4"></video>
+<main class="stage">
+  <h1 class="title">Choose your <span>fighters</span></h1>
+  <div class="picker">
+    <input id="char1" list="chars" autocomplete="off" placeholder="Character 1">
+    <img src="vs-transparent.png" class="vs" alt="VS">
+    <input id="char2" list="chars" autocomplete="off" placeholder="Character 2">
+  </div>
+  <button id="startBtn" class="go">⚔ Start Matchup</button>
+  <p id="error" class="error"></p>
+  <section id="arena" class="arena" hidden>
+    <div class="fighter left" id="fa"></div>
+    <img class="clash" src="vs-transparent.png" alt="VS">
+    <div class="fighter right" id="fb"></div>
+  </section>
+  <p id="status"></p>
+  <section id="result" class="result" hidden></section>
+</main>
+<script src="./characters.js"></script>
+<script src="./auth.js"></script>
+<script src="./Matchup.js"></script>
+</body>
+</html>
