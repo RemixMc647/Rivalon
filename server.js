@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 
 const express = require('express');
@@ -7,17 +8,13 @@ const jwt = require('jsonwebtoken');
 const { MongoClient, ObjectId } = require('mongodb');
 
 const { MONGODB_URI, JWT_SECRET, GROQ_API_KEY } = process.env;
-const MODEL = (!process.env.GROQ_MODEL || process.env.GROQ_MODEL === 'groq/compound' || process.env.GROQ_MODEL === 'groq/compound-mini')
-  ? 'openai/gpt-oss-120b'
-  : process.env.GROQ_MODEL; // fallback avoids retired Compound model IDs
+const MODEL = process.env.GROQ_MODEL || 'groq/compound';
 
 const app = express();
 app.use(express.json({ limit: '50kb' }));
 
-
 /* ------------------------------------------------------------------
-   STATIC FILES (served from the root directory)
-   The block list below keeps your server code and config private.
+   STATIC FILES
 ------------------------------------------------------------------ */
 
 const BLOCKED_FILES = [
@@ -54,7 +51,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-
 /* ------------------------------------------------------------------
    DATABASE
 ------------------------------------------------------------------ */
@@ -72,12 +68,12 @@ MongoClient.connect(MONGODB_URI)
   })
   .catch(e => console.error('MongoDB error:', e.message));
 
-
 /* ------------------------------------------------------------------
    HELPERS
 ------------------------------------------------------------------ */
 
-const sign = u => jwt.sign({ id: String(u._id) }, JWT_SECRET, { expiresIn: '7d' });
+const sign = u =>
+  jwt.sign({ id: String(u._id) }, JWT_SECRET, { expiresIn: '7d' });
 
 const clean = s =>
   String(s || '')
@@ -87,13 +83,15 @@ const clean = s =>
 
 const auth = (req, res, next) => {
   try {
-    req.user = jwt.verify((req.headers.authorization || '').slice(7), JWT_SECRET);
+    req.user = jwt.verify(
+      (req.headers.authorization || '').slice(7),
+      JWT_SECRET
+    );
     next();
   } catch {
     res.status(401).json({ message: 'Please log in' });
   }
 };
-
 
 /* ------------------------------------------------------------------
    AUTH ROUTES
@@ -134,83 +132,176 @@ app.post('/api/signup', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const u = await db.collection('users').findOne({
-    email: String(req.body.email || '').trim().toLowerCase()
-  });
+  try {
+    const u = await db.collection('users').findOne({
+      email: String(req.body.email || '').trim().toLowerCase()
+    });
 
-  if (!u || !await bcrypt.compare(String(req.body.password || ''), u.passwordHash)) {
-    return res.status(401).json({ message: 'Wrong email or password' });
+    if (!u || !await bcrypt.compare(
+      String(req.body.password || ''),
+      u.passwordHash
+    )) {
+      return res.status(401).json({
+        message: 'Wrong email or password'
+      });
+    }
+
+    res.json({
+      token: sign(u),
+      user: { username: u.username, email: u.email }
+    });
+  } catch (e) {
+    res.status(500).json({ message: 'Login failed' });
   }
-
-  res.json({
-    token: sign(u),
-    user: { username: u.username, email: u.email }
-  });
 });
 
 app.get('/api/me', auth, async (req, res) => {
-  const u = await db.collection('users').findOne({ _id: new ObjectId(req.user.id) });
-
-  u
-    ? res.json({ username: u.username, email: u.email, createdAt: u.createdAt })
-    : res.status(404).json({ message: 'Not found' });
-});
-
-
-/* ------------------------------------------------------------------
-   CHARACTER ARTWORK
-   Uses Wikipedia's public page-image API so the browser can display
-   a real image for each character without exposing API credentials.
------------------------------------------------------------------- */
-
-const imageCache = new Map();
-
-app.get('/api/character-image', async (req, res) => {
-  const name = clean(req.query.name);
-  if (!name) return res.status(400).json({ message: 'Enter a character name' });
-
-  const cacheKey = name.toLowerCase();
-  if (imageCache.has(cacheKey)) return res.json(imageCache.get(cacheKey));
-
   try {
-    const url = new URL('https://en.wikipedia.org/w/api.php');
-    url.search = new URLSearchParams({
-      action: 'query',
-      generator: 'search',
-      gsrsearch: name,
-      gsrlimit: '5',
-      prop: 'pageimages',
-      piprop: 'thumbnail',
-      pithumbsize: '700',
-      format: 'json',
-      origin: '*'
-    }).toString();
-
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'RivalonMatchup/1.0 (character image lookup)' },
-      signal: AbortSignal.timeout(7000)
+    const u = await db.collection('users').findOne({
+      _id: new ObjectId(req.user.id)
     });
-    if (!response.ok) throw new Error('Image lookup unavailable');
 
-    const data = await response.json();
-    const pages = Object.values(data.query?.pages || {});
-    const best = pages.find(page => page.thumbnail?.source) || null;
-    const result = best
-      ? { image: best.thumbnail.source, title: best.title }
-      : { image: null, title: name };
-
-    imageCache.set(cacheKey, result);
-    if (imageCache.size > 300) imageCache.delete(imageCache.keys().next().value);
-    res.set('Cache-Control', 'public, max-age=86400').json(result);
-  } catch (error) {
-    console.error('Character image lookup:', error.message);
-    res.json({ image: null, title: name });
+    u
+      ? res.json({
+          username: u.username,
+          email: u.email,
+          createdAt: u.createdAt
+        })
+      : res.status(404).json({ message: 'Not found' });
+  } catch (e) {
+    res.status(500).json({ message: 'Could not load account' });
   }
 });
 
+/* ------------------------------------------------------------------
+   CHARACTER IMAGE SEARCH
+   Searches MyAnimeList/Jikan first, then Wikipedia.
+------------------------------------------------------------------ */
+
+const imageCache = new Map();
+const IMAGE_CACHE_TIME = 24 * 60 * 60 * 1000;
+
+app.get('/api/character-image', async (req, res) => {
+  const name = clean(req.query.name);
+
+  if (!name) {
+    return res.status(400).json({
+      message: 'Enter a character name'
+    });
+  }
+
+  const key = name.toLowerCase();
+  const cached = imageCache.get(key);
+
+  if (cached && Date.now() - cached.time < IMAGE_CACHE_TIME) {
+    return res.json(cached.data);
+  }
+
+  try {
+    let result = null;
+
+    // First search anime and manga characters.
+    try {
+      const jikanResponse = await fetch(
+        'https://api.jikan.moe/v4/characters?q=' +
+        encodeURIComponent(name) +
+        '&limit=5'
+      );
+
+      if (jikanResponse.ok) {
+        const jikanData = await jikanResponse.json();
+        const characters = jikanData.data || [];
+
+        const match =
+          characters.find(c =>
+            c.name?.toLowerCase() === name.toLowerCase()
+          ) || characters[0];
+
+        const imageUrl =
+          match?.images?.webp?.image_url ||
+          match?.images?.jpg?.image_url;
+
+        if (imageUrl) {
+          result = {
+            imageUrl,
+            source: 'MyAnimeList'
+          };
+        }
+      }
+    } catch (e) {
+      console.log('Anime image search unavailable:', e.message);
+    }
+
+    // If no anime image was found, search Wikipedia.
+    if (!result) {
+      try {
+        const wikiResponse = await fetch(
+          'https://en.wikipedia.org/w/api.php?' +
+          new URLSearchParams({
+            action: 'query',
+            generator: 'search',
+            gsrsearch: name + ' character',
+            gsrlimit: '5',
+            prop: 'pageimages',
+            piprop: 'thumbnail',
+            pithumbsize: '600',
+            format: 'json'
+          }),
+          {
+            headers: {
+              'User-Agent': 'RivalonCharacterImageSearch/1.0'
+            }
+          }
+        );
+
+        if (wikiResponse.ok) {
+          const wikiData = await wikiResponse.json();
+          const pages = Object.values(
+            wikiData.query?.pages || {}
+          );
+
+          const match =
+            pages.find(p =>
+              p.title?.toLowerCase() === name.toLowerCase()
+            ) || pages[0];
+
+          if (match?.thumbnail?.source) {
+            result = {
+              imageUrl: match.thumbnail.source,
+              source: 'Wikipedia'
+            };
+          }
+        }
+      } catch (e) {
+        console.log('Wikipedia image search unavailable:', e.message);
+      }
+    }
+
+    const data = result || {
+      imageUrl: null,
+      source: null,
+      message: 'No matching image found'
+    };
+
+    imageCache.set(key, {
+      data,
+      time: Date.now()
+    });
+
+    res.json(data);
+
+  } catch (e) {
+    console.error('Character image error:', e.message);
+
+    res.status(500).json({
+      message: 'Could not search for this character image'
+    });
+  }
+});
 
 /* ------------------------------------------------------------------
-   RATE LIMIT (10 matchups per 10 minutes per IP)
+   RATE LIMIT
+   10 matchups per 10 minutes per IP
 ------------------------------------------------------------------ */
 
 const hits = new Map();
@@ -225,7 +316,6 @@ const limited = ip => {
   return a.length > 10;
 };
 
-
 /* ------------------------------------------------------------------
    MATCHUP ROUTE
 ------------------------------------------------------------------ */
@@ -235,11 +325,15 @@ app.post('/api/matchup', async (req, res) => {
   const b = clean(req.body.b);
 
   if (!a || !b || a.toLowerCase() === b.toLowerCase()) {
-    return res.status(400).json({ message: 'Pick two different characters' });
+    return res.status(400).json({
+      message: 'Pick two different characters'
+    });
   }
 
   if (limited(req.ip)) {
-    return res.status(429).json({ message: 'Too many matchups. Try again in a few minutes.' });
+    return res.status(429).json({
+      message: 'Too many matchups. Try again in a few minutes.'
+    });
   }
 
   const key = a.toLowerCase() + '|' + b.toLowerCase();
@@ -249,59 +343,46 @@ app.post('/api/matchup', async (req, res) => {
 
     if (hit) return res.json(hit.result);
 
-    const prompt = `Research "${a}" and "${b}" using web search. Compare their established powers, abilities, equipment, notable feats and weaknesses, then judge a fair fictional matchup using their strongest well-established versions. Reply with ONLY valid JSON, no markdown:
+    const prompt = `Use web search to research "${a}" and "${b}": powers, abilities, gear, feats and weaknesses. Then judge a fair fight at their canon peak. Reply with ONLY valid JSON, no markdown:
 {"a":{"name":""},"b":{"name":""},"stats":{"a":{"strength":0,"speed":0,"durability":0,"intelligence":0,"flight":0,"endurance":0},"b":{"strength":0,"speed":0,"durability":0,"intelligence":0,"flight":0,"endurance":0}},"winner":"a|b|draw","summary":"2 sentences","reasons":["4 specific reasons the winner won"],"scenarios":[{"title":"","winner":"a|b","detail":""},{"title":"","winner":"a|b","detail":""},{"title":"","winner":"a|b","detail":""}],"weaknesses":{"a":"","b":""}}
 Stats are 0-100. Character "a" is ${a}, character "b" is ${b}.`;
 
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + GROQ_API_KEY
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: 'You are Rivalon Matchup Analyst. Be fair, specific, and factual. Return one valid JSON object only, matching the requested structure. Keep every stat between 0 and 100.' },
-          { role: 'user', content: prompt }
-        ],
-        tools: [{ type: 'browser_search' }],
-        tool_choice: 'auto',
-        temperature: 0.2,
-        max_completion_tokens: 3000
-      })
-    });
+    const r = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + GROQ_API_KEY
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: 'user', content: prompt }
+          ]
+        })
+      }
+    );
 
     if (!r.ok) throw new Error('Groq ' + r.status);
 
-    const payload = await r.json();
-    const text = payload.choices?.[0]?.message?.content || '';
-    const jsonText = text.match(/\{[\s\S]*\}/)?.[0];
-    if (!jsonText) throw new Error('The matchup model returned no JSON result');
-    const result = JSON.parse(jsonText);
+    const text = (await r.json()).choices?.[0]?.message?.content || '';
+    const result = JSON.parse(text.match(/\{[\s\S]*\}/)[0]);
 
-    if (!result.a || !result.b || !result.stats) {
-      throw new Error('The matchup model returned an incomplete result');
+    if (!['a', 'b', 'draw'].includes(result.winner)) {
+      result.winner = 'draw';
     }
-    result.summary = String(result.summary || 'The matchup has been analyzed.');
-    result.reasons = Array.isArray(result.reasons) ? result.reasons : [];
-    result.scenarios = Array.isArray(result.scenarios) ? result.scenarios : [];
-    result.stats.a = result.stats.a || {};
-    result.stats.b = result.stats.b || {};
-    for (const side of ['a', 'b']) {
-      for (const stat of ['strength', 'speed', 'durability', 'intelligence', 'flight', 'endurance']) {
-        result.stats[side][stat] = Math.max(0, Math.min(100, Number(result.stats[side][stat]) || 0));
-      }
-    }
-    result.weaknesses = result.weaknesses || {};
-
-    if (!['a', 'b', 'draw'].includes(result.winner)) result.winner = 'draw';
 
     db.collection('matchups')
-      .insertOne({ key, result, createdAt: new Date() })
+      .insertOne({
+        key,
+        result,
+        createdAt: new Date()
+      })
       .catch(() => {});
 
     res.json(result);
+
   } catch (e) {
     console.error('matchup error:', e.message);
 
@@ -311,11 +392,13 @@ Stats are 0-100. Character "a" is ${a}, character "b" is ${b}.`;
   }
 });
 
-
 /* ------------------------------------------------------------------
    START
 ------------------------------------------------------------------ */
 
 app.listen(process.env.PORT || 3000, () =>
-  console.log('Rivalon running on http://localhost:' + (process.env.PORT || 3000))
+  console.log(
+    'Rivalon running on http://localhost:' +
+    (process.env.PORT || 3000)
+  )
 );
