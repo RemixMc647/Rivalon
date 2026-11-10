@@ -1,0 +1,2 @@
+const CHARACTERS=['Batman','Superman','Goku','Spider-Man','Iron Man','Thor','Hulk','Captain America','Wonder Woman','Flash','Naruto','Luffy','Saitama','Vegeta','Ichigo','Sasuke','Darth Vader','Yoda','Neo','John Wick','Sherlock Holmes','Gojo Satoru','Eren Yeager','Thanos','Joker','Deadpool','Wolverine','Doctor Strange','Black Panther','Levi Ackerman'];
+const FEATURED=[['Batman','Goku'],['Superman','Saitama'],['Naruto','Luffy'],['Iron Man','Batman'],['Thor','Hulk'],['Darth Vader','Yoda'],['Gojo Satoru','Sasuke'],['Spider-Man','Deadpool']];
