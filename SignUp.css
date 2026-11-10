@@ -97,108 +97,101 @@ font-style: italic;
 .span1{
 color: rgb(137, 118, 255);
 }
-/* ---------- Responsive base ---------- */
+
+/* ================================================== */
+/* RESPONSIVE (phones, tablets, any screen size)      */
+/* ================================================== */
 
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 html {
-  -webkit-text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
-  margin: 0;
-  max-width: 100%;
-  overflow-x: hidden;
+    margin: 0;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 img,
-video,
-canvas,
-svg {
-  max-width: 100%;
-  height: auto;
-}
-
-input,
-select,
-textarea,
-button {
-  font-size: 16px; /* stops iPhone from zooming in on inputs */
-  max-width: 100%;
-}
-
-table {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-pre,
-code {
-  max-width: 100%;
-  overflow-x: auto;
+video {
+    max-width: 100%;
 }
 
 
-/* ---------- Tablets ---------- */
+/* ---------- Tablets and phones ---------- */
 
 @media (max-width: 900px) {
-  .container,
-  .wrapper,
-  main {
-    width: 100%;
-    max-width: 100%;
-    padding-left: 16px;
-    padding-right: 16px;
-  }
+
+    .background {
+        width: 100%;
+        height: 100%;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .main-bar {
+        width: calc(100% - 32px);
+        max-width: 450px;
+        height: auto;
+        margin: 50px auto 30px auto;
+        padding: 30px 20px 20px 20px;
+    }
+
+    .text1 {
+        margin-top: 0;
+        font-size: 1.3rem;
+    }
+
+    .text2 {
+        font-size: 1rem;
+    }
+
+    .input1 {
+        width: 100%;
+        max-width: 350px;
+        margin-left: 0;
+        align-self: center;
+        font-size: 16px; /* stops iPhone from zooming in when typing */
+        padding: 0 14px;
+    }
+
+    .button1 {
+        width: 200px;
+        margin-left: 0;
+        align-self: center;
+        font-size: 16px;
+    }
+
+    .part1 {
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        margin-left: 0;
+        gap: 8px;
+    }
+
+    .text3 {
+        margin: 0;
+    }
+
+    .Login {
+        margin-top: 0;
+    }
 }
 
 
-/* ---------- Phones ---------- */
+/* ---------- Touch screens: no hover zoom (it causes overflow) ---------- */
 
-@media (max-width: 600px) {
-  body {
-    font-size: 15px;
-  }
+@media (hover: none) {
 
-  h1 {
-    font-size: 1.6rem;
-  }
-
-  h2 {
-    font-size: 1.3rem;
-  }
-
-  /* stack side-by-side layouts */
-  .row,
-  .grid,
-  .cards,
-  .matchup,
-  .fighters {
-    display: flex;
-    flex-direction: column;
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  /* full-width buttons and inputs */
-  button,
-  input,
-  select {
-    width: 100%;
-  }
-
-  /* easier to tap */
-  button,
-  a {
-    min-height: 44px;
-  }
-
-  nav {
-    flex-wrap: wrap;
-  }
+    .input1:hover,
+    .button1:hover {
+        transform: none;
+    }
 }
